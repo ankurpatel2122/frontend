@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 // --- TYPE DEFINITIONS ---
 interface Slip {
-    id: number;
+    id: string; // Changed to string for DB IDs
     slipNumber: string;
     status: 'Pending' | 'Complete';
     vehicleNumber: string;
@@ -20,6 +20,12 @@ interface Settings {
     address: string;
 }
 
+interface NewSlipData {
+    vehicleNumber: string;
+    material: string;
+    grossWeight: number;
+}
+
 type SetCurrentPageType = (page: string) => void;
 
 interface SidebarProps {
@@ -33,9 +39,8 @@ interface DashboardProps {
 }
 
 interface NewSlipFormProps {
-    addSlip: (slip: Omit<Slip, 'id' | 'slipNumber' | 'status' | 'grossWeightTime'>) => void;
+    addSlip: (slipData: NewSlipData) => Promise<void>;
     setCurrentPage: SetCurrentPageType;
-    nextSlipNumber: string;
 }
 
 interface AllSlipsProps {
@@ -46,13 +51,13 @@ interface AllSlipsProps {
 
 interface TareWeightModalProps {
     slip: Slip;
-    onSave: (id: number, tareWeight: number) => void;
+    onSave: (id: string, tareWeight: number) => Promise<void>;
     onCancel: () => void;
 }
 
 interface SettingsComponentProps {
     settings: Settings;
-    setSettings: (settings: Settings) => void;
+    onSaveSettings: (settings: Settings) => Promise<void>;
 }
 
 interface PrintViewProps {
@@ -60,6 +65,16 @@ interface PrintViewProps {
     settings: Settings;
     onCancel: () => void;
 }
+
+interface LoadingOverlayProps {
+    message?: string;
+}
+
+interface ErrorNotificationProps {
+    message: string;
+    onClose: () => void;
+}
+
 
 // Add declarations for CDN libraries
 declare const jspdf: any;
@@ -78,6 +93,75 @@ const formatDate = (date: Date) => {
 };
 
 const formatWeight = (weight: number) => `${weight.toFixed(3)} ton`;
+
+
+// --- UI FEEDBACK COMPONENTS ---
+
+const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ message = 'Loading...' }) => (
+    <div className="loading-overlay">
+        <div className="spinner"></div>
+        <p>{message}</p>
+    </div>
+);
+
+const ErrorNotification: React.FC<ErrorNotificationProps> = ({ message, onClose }) => (
+    <div className="error-notification">
+        <p>{message}</p>
+        <button onClick={onClose} className="close-button">&times;</button>
+    </div>
+);
+
+
+// --- API COMMUNICATION LAYER ---
+// This layer contains functions to communicate with the backend API.
+// Replace "/api" with your actual backend URL prefix if different.
+
+const API_BASE_URL = '/api';
+
+const apiService = {
+    async getSlips(): Promise<Slip[]> {
+        const response = await fetch(`${API_BASE_URL}/slips`);
+        if (!response.ok) throw new Error('Failed to fetch slips.');
+        return response.json();
+    },
+
+    async getSettings(): Promise<Settings> {
+        const response = await fetch(`${API_BASE_URL}/settings`);
+        if (!response.ok) throw new Error('Failed to fetch settings.');
+        return response.json();
+    },
+
+    async createSlip(slipData: NewSlipData): Promise<Slip> {
+        const response = await fetch(`${API_BASE_URL}/slips`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(slipData),
+        });
+        if (!response.ok) throw new Error('Failed to create slip.');
+        return response.json();
+    },
+
+    async completeSlip(id: string, tareWeight: number): Promise<Slip> {
+        const response = await fetch(`${API_BASE_URL}/slips/${id}/complete`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tareWeight }),
+        });
+        if (!response.ok) throw new Error('Failed to complete slip.');
+        return response.json();
+    },
+
+    async saveSettings(settings: Settings): Promise<Settings> {
+        const response = await fetch(`${API_BASE_URL}/settings`, {
+            method: 'POST', // Or PUT, depending on your API design
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+        });
+        if (!response.ok) throw new Error('Failed to save settings.');
+        return response.json();
+    }
+};
+
 
 // --- COMPONENTS ---
 
@@ -117,43 +201,54 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage, pendingSlipsCount
     </div>
 );
 
-const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage, nextSlipNumber }) => {
+const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage }) => {
     const [vehicleNumber, setVehicleNumber] = useState('');
     const [material, setMaterial] = useState('');
     const [grossWeight, setGrossWeight] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!vehicleNumber || !material || !grossWeight) {
             alert('Please fill all fields');
             return;
         }
-        addSlip({
-            vehicleNumber: vehicleNumber.toUpperCase(),
-            material,
-            grossWeight: parseFloat(grossWeight),
-        });
-        setCurrentPage('All Slips');
+        setIsSubmitting(true);
+        try {
+            await addSlip({
+                vehicleNumber: vehicleNumber.toUpperCase(),
+                material,
+                grossWeight: parseFloat(grossWeight),
+            });
+            setCurrentPage('All Slips');
+        } catch (error) {
+            // Error is handled globally in the App component
+            console.error(error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
         <div>
-            <h2 className="page-header">Create New Slip (Gross Weight) - Slip #{nextSlipNumber}</h2>
+            <h2 className="page-header">Create New Slip (Gross Weight)</h2>
             <div className="form-container">
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label htmlFor="vehicleNumber">Vahan Number (Vehicle Number)</label>
-                        <input id="vehicleNumber" type="text" value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value)} required />
+                        <input id="vehicleNumber" type="text" value={vehicleNumber} onChange={e => setVehicleNumber(e.target.value)} required disabled={isSubmitting} />
                     </div>
                     <div className="form-group">
                         <label htmlFor="material">Material</label>
-                        <input id="material" type="text" value={material} onChange={e => setMaterial(e.target.value)} required />
+                        <input id="material" type="text" value={material} onChange={e => setMaterial(e.target.value)} required disabled={isSubmitting} />
                     </div>
                     <div className="form-group">
                         <label htmlFor="grossWeight">Pehla Wajan (Gross Weight in ton)</label>
-                        <input id="grossWeight" type="number" step="0.001" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} required />
+                        <input id="grossWeight" type="number" step="0.001" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} required disabled={isSubmitting} />
                     </div>
-                    <button type="submit" className="btn btn-primary">Generate Pending Slip</button>
+                    <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                        {isSubmitting ? 'Generating...' : 'Generate Pending Slip'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -251,13 +346,22 @@ const AllSlips: React.FC<AllSlipsProps> = ({ slips, onComplete, onPrint }) => {
 
 const TareWeightModal: React.FC<TareWeightModalProps> = ({ slip, onSave, onCancel }) => {
     const [tareWeight, setTareWeight] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!tareWeight) {
             alert('Please enter Tare Weight.');
             return;
         }
-        onSave(slip.id, parseFloat(tareWeight));
+        setIsSubmitting(true);
+        try {
+            await onSave(slip.id, parseFloat(tareWeight));
+        } catch (error) {
+            // Error is handled globally
+            console.error(error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -265,25 +369,28 @@ const TareWeightModal: React.FC<TareWeightModalProps> = ({ slip, onSave, onCance
             <div className="modal-content">
                 <div className="modal-header">
                     <h2>Complete Weighment for Slip #{slip.slipNumber}</h2>
-                    <button onClick={onCancel} className="close-button">&times;</button>
+                    <button onClick={onCancel} className="close-button" disabled={isSubmitting}>&times;</button>
                 </div>
                 <p><strong>Vehicle Number:</strong> {slip.vehicleNumber}</p>
                 <p><strong>Gross Weight:</strong> {formatWeight(slip.grossWeight)}</p>
                 <div className="form-group">
                     <label htmlFor="tareWeight">Dusra Wajan (Tare Weight in ton)</label>
-                    <input id="tareWeight" type="number" step="0.001" value={tareWeight} onChange={e => setTareWeight(e.target.value)} required />
+                    <input id="tareWeight" type="number" step="0.001" value={tareWeight} onChange={e => setTareWeight(e.target.value)} required disabled={isSubmitting} />
                 </div>
                 <div className="modal-actions">
-                    <button className="btn btn-danger" onClick={onCancel}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSave}>Save and Complete</button>
+                    <button className="btn btn-danger" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save and Complete'}
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
-const SettingsComponent: React.FC<SettingsComponentProps> = ({ settings, setSettings }) => {
+const SettingsComponent: React.FC<SettingsComponentProps> = ({ settings, onSaveSettings }) => {
     const [formState, setFormState] = useState(settings);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         setFormState(settings);
@@ -293,10 +400,18 @@ const SettingsComponent: React.FC<SettingsComponentProps> = ({ settings, setSett
         setFormState({ ...formState, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSettings(formState);
-        alert('Settings saved!');
+        setIsSubmitting(true);
+        try {
+            await onSaveSettings(formState);
+            alert('Settings saved!');
+        } catch (error) {
+             // Error is handled globally
+             console.error(error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -306,13 +421,15 @@ const SettingsComponent: React.FC<SettingsComponentProps> = ({ settings, setSett
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label htmlFor="companyName">Company Name</label>
-                        <input type="text" id="companyName" name="companyName" value={formState.companyName} onChange={handleChange} />
+                        <input type="text" id="companyName" name="companyName" value={formState.companyName} onChange={handleChange} disabled={isSubmitting} />
                     </div>
                     <div className="form-group">
                         <label htmlFor="address">Address</label>
-                        <input type="text" id="address" name="address" value={formState.address} onChange={handleChange} />
+                        <input type="text" id="address" name="address" value={formState.address} onChange={handleChange} disabled={isSubmitting} />
                     </div>
-                    <button type="submit" className="btn btn-primary">Save Settings</button>
+                    <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save Settings'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -328,12 +445,11 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
         const elementToCapture = printRef.current;
         if (!elementToCapture) return;
     
-        // Temporarily add a class that mimics print styles
         elementToCapture.classList.add('pdf-capture-mode');
     
         try {
             const canvas = await html2canvas(elementToCapture, {
-                scale: 2, // Higher scale for better quality
+                scale: 2,
                 useCORS: true,
                 windowWidth: elementToCapture.scrollWidth,
                 windowHeight: elementToCapture.scrollHeight
@@ -347,7 +463,7 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
             const imgProps= pdf.getImageProperties(imgData);
             const imgRatio = imgProps.height / imgProps.width;
             
-            let imgWidth = pdfWidth - 20; // with margin
+            let imgWidth = pdfWidth - 20;
             let imgHeight = imgWidth * imgRatio;
     
             if (imgHeight > pdfHeight - 20) {
@@ -356,7 +472,7 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
             }
     
             const x = (pdfWidth - imgWidth) / 2;
-            const y = 10; // Top margin
+            const y = 10;
     
             pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
             pdf.save(`weighment-slip-${slip.slipNumber}.pdf`);
@@ -364,7 +480,6 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
             console.error("Error generating PDF:", error);
             alert("Could not generate PDF. Please try again.");
         } finally {
-            // Always remove the class
             elementToCapture.classList.remove('pdf-capture-mode');
         }
     };
@@ -408,12 +523,10 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
                      <button className="btn btn-secondary" onClick={handleDownloadPdf}>Download PDF</button>
                      <button className="btn btn-primary" onClick={() => window.print()}>Print</button>
                 </div>
-                {/* This container is only for printing, not for display */}
                 <div className="print-container" ref={printRef}>
                     <SlipCopy copyTitle="Customer Copy" />
                     <SlipCopy copyTitle="Office Copy" />
                 </div>
-                {/* This container is for on-screen preview */}
                 <div className="no-print" style={{height: '50vh', overflowY: 'auto', border: '1px solid #ccc', padding: '10px'}}>
                      <SlipCopy copyTitle="Customer Copy" />
                      <SlipCopy copyTitle="Office Copy" />
@@ -427,26 +540,42 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
 // --- APP ---
 const App = () => {
     const [currentPage, setCurrentPage] = useState('Dashboard');
-    const [slips, setSlips] = useState<Slip[]>(() => {
-        const savedSlips = localStorage.getItem('weighbridgeSlips');
-        return savedSlips ? JSON.parse(savedSlips) : [];
-    });
-    const [settings, setSettings] = useState<Settings>(() => {
-        const savedSettings = localStorage.getItem('weighbridgeSettings');
-        return savedSettings ? JSON.parse(savedSettings) : { companyName: 'My Weighbridge', address: '123 Main St, Anytown' };
-    });
+    const [slips, setSlips] = useState<Slip[]>([]);
+    const [settings, setSettings] = useState<Settings>({ companyName: '', address: '' });
     
     const [slipToComplete, setSlipToComplete] = useState<Slip | null>(null);
     const [slipToPrint, setSlipToPrint] = useState<Slip | null>(null);
     const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-    useEffect(() => {
-        localStorage.setItem('weighbridgeSlips', JSON.stringify(slips));
-    }, [slips]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        localStorage.setItem('weighbridgeSettings', JSON.stringify(settings));
-    }, [settings]);
+        const loadInitialData = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                // Fetch slips and settings in parallel
+                const [fetchedSlips, fetchedSettings] = await Promise.all([
+                    apiService.getSlips(),
+                    apiService.getSettings()
+                ]);
+                setSlips(fetchedSlips);
+                setSettings(fetchedSettings);
+            } catch (err) {
+                if (err instanceof Error) {
+                   setError(`Failed to load application data: ${err.message}. Please try refreshing the page.`);
+                } else {
+                   setError('An unknown error occurred while loading data.');
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadInitialData();
+    }, []);
+
 
     const handleSetCurrentPage = (page: string) => {
         setCurrentPage(page);
@@ -455,44 +584,49 @@ const App = () => {
         }
     };
 
-    const getNextSlipNumber = () => {
-        const lastId = slips.reduce((max, slip) => Math.max(parseInt(slip.slipNumber, 10), max), 0);
-        return (lastId + 1).toString().padStart(5, '0');
+    const addSlip = async (slipData: NewSlipData) => {
+        setError(null);
+        try {
+            const newSlip = await apiService.createSlip(slipData);
+            setSlips(prev => [...prev, newSlip]);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(`Could not create slip: ${errorMessage}`);
+            throw err; // Re-throw to be caught in form component
+        }
     };
 
-    const addSlip = (slipData: Omit<Slip, 'id' | 'slipNumber' | 'status' | 'grossWeightTime'>) => {
-        const newSlip: Slip = {
-            ...slipData,
-            id: Date.now(),
-            slipNumber: getNextSlipNumber(),
-            status: 'Pending',
-            grossWeightTime: formatDate(new Date()),
-        };
-        setSlips(prev => [...prev, newSlip]);
-    };
-
-
-
-    const completeSlip = (id: number, tareWeight: number) => {
-        setSlips(prevSlips => prevSlips.map(s => {
-            if (s.id === id) {
-                const netWeight = Math.abs(s.grossWeight - tareWeight);
-                return {
-                    ...s,
-                    status: 'Complete',
-                    tareWeight,
-                    netWeight: netWeight,
-                    tareWeightTime: formatDate(new Date()),
-                };
-            }
-            return s;
-        }));
-        setSlipToComplete(null);
+    const completeSlip = async (id: string, tareWeight: number) => {
+        setError(null);
+        try {
+            const updatedSlip = await apiService.completeSlip(id, tareWeight);
+            setSlips(prevSlips => prevSlips.map(s => (s.id === id ? updatedSlip : s)));
+            setSlipToComplete(null);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(`Could not complete slip: ${errorMessage}`);
+            throw err; // Re-throw to be caught in modal component
+        }
     };
     
+    const handleSaveSettings = async (newSettings: Settings) => {
+        setError(null);
+        try {
+            const savedSettings = await apiService.saveSettings(newSettings);
+            setSettings(savedSettings);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(`Could not save settings: ${errorMessage}`);
+            throw err; // Re-throw to be caught in settings component
+        }
+    };
+
     const renderPage = () => {
+        // Don't render pages until initial data is loaded, show spinner instead
+        if (isLoading) return null; 
+
         if (currentPage === 'New Slip') {
-            return <NewSlipForm addSlip={addSlip} setCurrentPage={handleSetCurrentPage} nextSlipNumber={getNextSlipNumber()} />;
+            return <NewSlipForm addSlip={addSlip} setCurrentPage={handleSetCurrentPage} />;
         }
         switch (currentPage) {
             case 'Dashboard':
@@ -500,7 +634,7 @@ const App = () => {
             case 'All Slips':
                 return <AllSlips slips={slips} onComplete={setSlipToComplete} onPrint={setSlipToPrint} />;
             case 'Settings':
-                return <SettingsComponent settings={settings} setSettings={setSettings} />;
+                return <SettingsComponent settings={settings} onSaveSettings={handleSaveSettings} />;
             default:
                 return <Dashboard setCurrentPage={handleSetCurrentPage} pendingSlipsCount={slips.filter(s => s.status === 'Pending').length} />;
         }
@@ -508,7 +642,11 @@ const App = () => {
 
     return (
         <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+            {error && <ErrorNotification message={error} onClose={() => setError(null)} />}
+            {isLoading && <LoadingOverlay message="Loading Data..." />}
+            
             <Sidebar currentPage={currentPage} setCurrentPage={handleSetCurrentPage} />
+            
             <main className="main-content no-print">
                 {renderPage()}
             </main>
