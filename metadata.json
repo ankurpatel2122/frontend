@@ -1,0 +1,6 @@
+{
+  "name": "Digital Weighbridge System",
+  "description": "A web application to digitize weighbridge operations, manage slips, and print receipts.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
