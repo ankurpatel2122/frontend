@@ -61,6 +61,9 @@ interface PrintViewProps {
     onCancel: () => void;
 }
 
+// Add declarations for CDN libraries
+declare const jspdf: any;
+declare const html2canvas: any;
 
 // --- UTILITY FUNCTIONS ---
 const formatDate = (date: Date) => {
@@ -318,7 +321,54 @@ const SettingsComponent: React.FC<SettingsComponentProps> = ({ settings, setSett
 
 
 const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
-    const printRef = useRef(null);
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const handleDownloadPdf = async () => {
+        const { jsPDF } = jspdf;
+        const elementToCapture = printRef.current;
+        if (!elementToCapture) return;
+    
+        // Temporarily add a class that mimics print styles
+        elementToCapture.classList.add('pdf-capture-mode');
+    
+        try {
+            const canvas = await html2canvas(elementToCapture, {
+                scale: 2, // Higher scale for better quality
+                useCORS: true,
+                windowWidth: elementToCapture.scrollWidth,
+                windowHeight: elementToCapture.scrollHeight
+            });
+    
+            const imgData = canvas.toDataURL('image/png');
+    
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgProps= pdf.getImageProperties(imgData);
+            const imgRatio = imgProps.height / imgProps.width;
+            
+            let imgWidth = pdfWidth - 20; // with margin
+            let imgHeight = imgWidth * imgRatio;
+    
+            if (imgHeight > pdfHeight - 20) {
+                imgHeight = pdfHeight - 20;
+                imgWidth = imgHeight / imgRatio;
+            }
+    
+            const x = (pdfWidth - imgWidth) / 2;
+            const y = 10; // Top margin
+    
+            pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+            pdf.save(`weighment-slip-${slip.slipNumber}.pdf`);
+        } catch(error) {
+            console.error("Error generating PDF:", error);
+            alert("Could not generate PDF. Please try again.");
+        } finally {
+            // Always remove the class
+            elementToCapture.classList.remove('pdf-capture-mode');
+        }
+    };
+
 
     const SlipCopy = ({copyTitle}: {copyTitle: string}) => (
         <div className="slip-copy">
@@ -355,7 +405,8 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
                     <button onClick={onCancel} className="close-button">&times;</button>
                 </div>
                 <div className="print-controls no-print">
-                     <button className="btn btn-secondary" onClick={() => window.print()}>Print / Download PDF</button>
+                     <button className="btn btn-secondary" onClick={handleDownloadPdf}>Download PDF</button>
+                     <button className="btn btn-primary" onClick={() => window.print()}>Print</button>
                 </div>
                 {/* This container is only for printing, not for display */}
                 <div className="print-container" ref={printRef}>
