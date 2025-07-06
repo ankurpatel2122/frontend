@@ -122,13 +122,13 @@ const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || '/api';
 
 const apiService = {
     async getSlips(): Promise<Slip[]> {
-        const response = await fetch(`${API_BASE_URL}/api/slips`);
+        const response = await fetch(`${API_BASE_URL}/slips`);
         if (!response.ok) throw new Error('Failed to fetch slips.');
         return response.json();
     },
 
     async getSettings(): Promise<Settings> {
-        const response = await fetch(`${API_BASE_URL}/api/settings`);
+        const response = await fetch(`${API_BASE_URL}/settings`);
         if (!response.ok) throw new Error('Failed to fetch settings.');
         return response.json();
     },
@@ -144,7 +144,7 @@ const apiService = {
     },
 
     async completeSlip(id: string, tareWeight: number): Promise<Slip> {
-        const response = await fetch(`${API_BASE_URL}/api/slips/${id}/complete`, {
+        const response = await fetch(`${API_BASE_URL}/slips/${id}/complete`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tareWeight }),
@@ -154,7 +154,7 @@ const apiService = {
     },
 
     async saveSettings(settings: Settings): Promise<Settings> {
-        const response = await fetch(`${API_BASE_URL}/api/settings`, {
+        const response = await fetch(`${API_BASE_URL}/settings`, {
             method: 'POST', // Or PUT, depending on your API design
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings),
