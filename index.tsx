@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -114,11 +115,9 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ message, onClose 
 
 // --- API COMMUNICATION LAYER ---
 // This layer contains functions to communicate with the backend API.
-// Uses API_BASE_URL from environment variable if available, otherwise defaults to '/api'.
+// Replace "/api" with your actual backend URL prefix if different.
 
-// TypeScript support for import.meta.env (Vite)
-// Use the Vite-provided type for import.meta.env
-const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = process.env.VITE_API_BASE_URL || '/api';
 
 const apiService = {
     async getSlips(): Promise<Slip[]> {
