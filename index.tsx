@@ -117,7 +117,7 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ message, onClose 
 // This layer contains functions to communicate with the backend API.
 // Replace "/api" with your actual backend URL prefix if different.
 
-const API_BASE_URL = process.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const apiService = {
     async getSlips(): Promise<Slip[]> {
