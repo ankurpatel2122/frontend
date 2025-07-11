@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -123,7 +122,8 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ message, onClose 
 
 
 // --- API COMMUNICATION LAYER ---
-const API_BASE_URL = '/api';
+// Use Vite env variable for API base URL, fallback to '/api' if not set
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const apiService = {
     async getSlips(): Promise<Slip[]> {
