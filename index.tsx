@@ -3,14 +3,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // --- TYPE DEFINITIONS ---
+
+// Fix for `import.meta.env` TypeScript error
+interface ImportMeta {
+    readonly env: {
+        readonly VITE_API_BASE_URL?: string;
+    }
+}
+
 interface Slip {
     id: string; // Changed to string for DB IDs
     slipNumber: string;
     status: 'Pending' | 'Complete';
     vehicleNumber: string;
     material: string;
-    grossWeight: number;
-    grossWeightTime: string;
+    grossWeight?: number; // Made optional to prevent crashes if missing from API
+    grossWeightTime?: string; // Made optional
     tareWeight?: number;
     tareWeightTime?: string;
     netWeight?: number;
@@ -93,7 +101,12 @@ const formatDate = (date: Date) => {
     });
 };
 
-const formatWeight = (weight: number) => `${weight.toFixed(3)} ton`;
+const formatWeight = (weight?: number | null) => {
+    if (typeof weight === 'number' && !isNaN(weight)) {
+        return `${weight.toFixed(3)} ton`;
+    }
+    return ''; // Return empty string for invalid or missing data to prevent crash
+};
 
 
 // --- UI FEEDBACK COMPONENTS ---
@@ -296,7 +309,7 @@ const AllSlips: React.FC<AllSlipsProps> = ({ slips, onComplete, onPrint }) => {
                                         <td data-label="Slip No.">{slip.slipNumber}</td>
                                         <td data-label="Vehicle No.">{slip.vehicleNumber}</td>
                                         <td data-label="Gross Weight">{formatWeight(slip.grossWeight)}</td>
-                                        <td data-label="Date/Time">{slip.grossWeightTime}</td>
+                                        <td data-label="Date/Time">{slip.grossWeightTime || ''}</td>
                                         <td data-label="Actions">
                                             <button className="btn btn-secondary" onClick={() => onComplete(slip)}>
                                                 Add Tare Weight
@@ -327,8 +340,8 @@ const AllSlips: React.FC<AllSlipsProps> = ({ slips, onComplete, onPrint }) => {
                                 <tr key={slip.id}>
                                     <td data-label="Slip No.">{slip.slipNumber}</td>
                                     <td data-label="Vehicle No.">{slip.vehicleNumber}</td>
-                                    <td data-label="Net Weight">{slip.netWeight && formatWeight(slip.netWeight)}</td>
-                                    <td data-label="Date/Time">{slip.tareWeightTime}</td>
+                                    <td data-label="Net Weight">{formatWeight(slip.netWeight)}</td>
+                                    <td data-label="Date/Time">{slip.tareWeightTime || ''}</td>
                                     <td data-label="Actions">
                                         <button className="btn btn-primary" onClick={() => onPrint(slip)}>
                                             View / Print
@@ -500,10 +513,10 @@ const PrintView: React.FC<PrintViewProps> = ({ slip, settings, onCancel }) => {
                     <tr><td>Vehicle No.</td><td>{slip.vehicleNumber}</td></tr>
                     <tr><td>Material</td><td>{slip.material}</td></tr>
                     <tr><td>Gross Weight</td><td>{formatWeight(slip.grossWeight)}</td></tr>
-                    <tr><td>Gross Weight Time</td><td>{slip.grossWeightTime}</td></tr>
-                    <tr><td>Tare Weight</td><td>{slip.tareWeight ? formatWeight(slip.tareWeight) : ''}</td></tr>
-                    <tr><td>Tare Weight Time</td><td>{slip.tareWeightTime}</td></tr>
-                    <tr><td style={{fontWeight: 'bold'}}>Net Weight</td><td style={{fontWeight: 'bold'}}>{slip.netWeight ? formatWeight(slip.netWeight) : ''}</td></tr>
+                    <tr><td>Gross Weight Time</td><td>{slip.grossWeightTime || ''}</td></tr>
+                    <tr><td>Tare Weight</td><td>{formatWeight(slip.tareWeight)}</td></tr>
+                    <tr><td>Tare Weight Time</td><td>{slip.tareWeightTime || ''}</td></tr>
+                    <tr><td style={{fontWeight: 'bold'}}>Net Weight</td><td style={{fontWeight: 'bold'}}>{formatWeight(slip.netWeight)}</td></tr>
                 </tbody>
             </table>
             <div className="print-footer">
