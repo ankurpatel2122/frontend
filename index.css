@@ -108,20 +108,6 @@ body {
     margin-bottom: 25px;
 }
 
-.dashboard .new-slip-actions {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-top: 25px;
-    flex-wrap: wrap;
-}
-
-.dashboard .new-slip-actions .btn {
-    padding: 15px 30px;
-    font-size: 1.1rem;
-}
-
-
 /* Buttons */
 .btn {
     padding: 12px 25px;
