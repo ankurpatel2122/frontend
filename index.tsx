@@ -4,21 +4,14 @@ import { createRoot } from 'react-dom/client';
 
 // --- TYPE DEFINITIONS ---
 
-// Fix for `import.meta.env` TypeScript error
-interface ImportMeta {
-    readonly env: {
-        readonly VITE_API_BASE_URL?: string;
-    }
-}
-
 interface Slip {
-    id: string; // Changed to string for DB IDs
+    id: string;
     slipNumber: string;
     status: 'Pending' | 'Complete';
     vehicleNumber: string;
     material: string;
-    grossWeight?: number; // Made optional to prevent crashes if missing from API
-    grossWeightTime?: string; // Made optional
+    grossWeight?: number;
+    grossWeightTime?: string;
     tareWeight?: number;
     tareWeightTime?: string;
     netWeight?: number;
@@ -29,10 +22,11 @@ interface Settings {
     address: string;
 }
 
-interface NewSlipData {
+interface NewSlipPayload {
     vehicleNumber: string;
     material: string;
-    grossWeight: number;
+    grossWeight?: number;
+    tareWeight?: number;
 }
 
 type SetCurrentPageType = (page: string) => void;
@@ -44,12 +38,14 @@ interface SidebarProps {
 
 interface DashboardProps {
     setCurrentPage: SetCurrentPageType;
+    onNewSlip: (type: 'gross' | 'tare') => void;
     pendingSlipsCount: number;
 }
 
 interface NewSlipFormProps {
-    addSlip: (slipData: NewSlipData) => Promise<void>;
+    addSlip: (slipData: NewSlipPayload) => Promise<void>;
     setCurrentPage: SetCurrentPageType;
+    weighmentType: 'gross' | 'tare';
 }
 
 interface AllSlipsProps {
@@ -58,9 +54,9 @@ interface AllSlipsProps {
     onPrint: (slip: Slip) => void;
 }
 
-interface TareWeightModalProps {
+interface CompleteWeighmentModalProps {
     slip: Slip;
-    onSave: (id: string, tareWeight: number) => Promise<void>;
+    onSave: (id: string, weightData: { grossWeight?: number; tareWeight?: number }) => Promise<void>;
     onCancel: () => void;
 }
 
@@ -126,55 +122,169 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ message, onClose 
 );
 
 
-// --- API COMMUNICATION LAYER ---
-// This layer contains functions to communicate with the backend API.
-// Replace "/api" with your actual backend URL prefix if different.
+// --- MOCK DATA (for development) ---
+let mockSlips: Slip[] = [
+    {
+        id: '1', slipNumber: 'SLIP-001', status: 'Complete', vehicleNumber: 'MH04AB1234', material: 'Cement',
+        grossWeight: 20.150, grossWeightTime: formatDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)),
+        tareWeight: 5.150, tareWeightTime: formatDate(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 3600000)),
+        netWeight: 15.000
+    },
+    {
+        id: '2', slipNumber: 'SLIP-002', status: 'Pending', vehicleNumber: 'GJ01CD5678', material: 'Sand',
+        grossWeight: 25.500, grossWeightTime: formatDate(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)),
+    },
+];
+let mockSettings: Settings = {
+    companyName: 'Gada Electronics',
+    address: 'Powder Gali, Goregaon, Mumbai'
+};
+let nextSlipId = 3;
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-const apiService = {
+// --- API CONFIGURATION ---
+// In a real application with a build process (like Vite or Create React App),
+// you would get this from an environment variable. For example:
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+// For now, we define it as a placeholder. Replace this when you deploy.
+const API_BASE_URL = 'http://localhost:5000/api'; // Replace with your actual backend URL
+
+
+// --- REAL API SERVICE (Template using fetch for when your backend is ready) ---
+// To use this, you would uncomment it and change the export at the bottom of this file.
+const realApiService = {
+    async fetchWrapper(url: string, options: RequestInit = {}) {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            },
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred.' }));
+            throw new Error(errorData.message || `Request failed with status ${response.status}`);
+        }
+         // Handle cases where response might be empty (e.g., 204 No Content)
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            return response.json();
+        }
+        return {};
+    },
+
     async getSlips(): Promise<Slip[]> {
-        const response = await fetch(`${API_BASE_URL}/slips`);
-        if (!response.ok) throw new Error('Failed to fetch slips.');
-        return response.json();
+        console.log("REAL API: Fetching all slips...");
+        return this.fetchWrapper(`${API_BASE_URL}/slips`);
     },
 
     async getSettings(): Promise<Settings> {
-        const response = await fetch(`${API_BASE_URL}/settings`);
-        if (!response.ok) throw new Error('Failed to fetch settings.');
-        return response.json();
+        console.log("REAL API: Fetching settings...");
+        return this.fetchWrapper(`${API_BASE_URL}/settings`);
     },
 
-    async createSlip(slipData: NewSlipData): Promise<Slip> {
-        const response = await fetch(`${API_BASE_URL}/slips`, {
+    async createSlip(slipData: NewSlipPayload): Promise<Slip> {
+        console.log("REAL API: Creating new slip...", slipData);
+        return this.fetchWrapper(`${API_BASE_URL}/slips`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(slipData),
         });
-        if (!response.ok) throw new Error('Failed to create slip.');
-        return response.json();
     },
 
-    async completeSlip(id: string, tareWeight: number): Promise<Slip> {
-        const response = await fetch(`${API_BASE_URL}/slips/${id}/complete`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tareWeight }),
+    async completeSlip(id: string, weightData: { grossWeight?: number; tareWeight?: number }): Promise<Slip> {
+        console.log(`REAL API: Completing slip ${id}...`, weightData);
+        return this.fetchWrapper(`${API_BASE_URL}/slips/${id}/complete`, {
+            method: 'PATCH',
+            body: JSON.stringify(weightData),
         });
-        if (!response.ok) throw new Error('Failed to complete slip.');
-        return response.json();
     },
 
     async saveSettings(settings: Settings): Promise<Settings> {
-        const response = await fetch(`${API_BASE_URL}/settings`, {
-            method: 'POST', // Or PUT, depending on your API design
-            headers: { 'Content-Type': 'application/json' },
+        console.log("REAL API: Saving settings...", settings);
+        return this.fetchWrapper(`${API_BASE_URL}/settings`, {
+            method: 'POST',
             body: JSON.stringify(settings),
         });
-        if (!response.ok) throw new Error('Failed to save settings.');
-        return response.json();
     }
 };
+
+// --- MOCK API SERVICE (For development without a real backend) ---
+const mockApiService = {
+    async getSlips(): Promise<Slip[]> {
+        console.log("MOCK API: Fetching all slips...");
+        return new Promise(resolve => setTimeout(() => resolve([...mockSlips].sort((a, b) => parseInt(b.slipNumber.split('-')[1]) - parseInt(a.slipNumber.split('-')[1]))), 500));
+    },
+
+    async getSettings(): Promise<Settings> {
+        console.log("MOCK API: Fetching settings...");
+        return new Promise(resolve => setTimeout(() => resolve({ ...mockSettings }), 300));
+    },
+
+    async createSlip(slipData: NewSlipPayload): Promise<Slip> {
+        console.log("MOCK API: Creating new slip...", slipData);
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const newSlip: Slip = {
+                    id: String(nextSlipId++),
+                    slipNumber: `SLIP-${String(nextSlipId - 1).padStart(3, '0')}`,
+                    status: 'Pending',
+                    vehicleNumber: slipData.vehicleNumber,
+                    material: slipData.material,
+                    ...(slipData.grossWeight !== undefined && { grossWeight: slipData.grossWeight, grossWeightTime: formatDate(new Date()) }),
+                    ...(slipData.tareWeight !== undefined && { tareWeight: slipData.tareWeight, tareWeightTime: formatDate(new Date()) }),
+                };
+                mockSlips.unshift(newSlip);
+                resolve(newSlip);
+            }, 700);
+        });
+    },
+
+    async completeSlip(id: string, weightData: { grossWeight?: number; tareWeight?: number }): Promise<Slip> {
+        console.log(`MOCK API: Completing slip ${id}...`, weightData);
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                const slipIndex = mockSlips.findIndex(s => s.id === id);
+                if (slipIndex === -1) {
+                    return reject(new Error('Slip not found.'));
+                }
+
+                const slipToUpdate = { ...mockSlips[slipIndex] };
+                
+                if(weightData.grossWeight !== undefined) {
+                    slipToUpdate.grossWeight = weightData.grossWeight;
+                    slipToUpdate.grossWeightTime = formatDate(new Date());
+                }
+                if(weightData.tareWeight !== undefined) {
+                    slipToUpdate.tareWeight = weightData.tareWeight;
+                    slipToUpdate.tareWeightTime = formatDate(new Date());
+                }
+                
+                if (slipToUpdate.grossWeight !== undefined && slipToUpdate.tareWeight !== undefined) {
+                    slipToUpdate.status = 'Complete';
+                    slipToUpdate.netWeight = Math.abs(slipToUpdate.grossWeight - slipToUpdate.tareWeight);
+                }
+                
+                mockSlips[slipIndex] = slipToUpdate;
+                resolve(slipToUpdate);
+            }, 600);
+        });
+    },
+
+    async saveSettings(settings: Settings): Promise<Settings> {
+        console.log("MOCK API: Saving settings...", settings);
+        return new Promise(resolve => {
+            setTimeout(() => {
+                mockSettings = { ...settings };
+                resolve({ ...mockSettings });
+            }, 400);
+        });
+    }
+};
+
+
+// --- SERVICE TO USE ---
+// To switch to your real backend, change `mockApiService` to `realApiService`.
+const apiService = mockApiService;
 
 
 // --- COMPONENTS ---
@@ -199,14 +309,19 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage, pendingSlipsCount }) => (
+const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage, onNewSlip, pendingSlipsCount }) => (
     <div className="dashboard">
         <h2 className="page-header">Dashboard</h2>
         <div className="dashboard-card">
-            <p>Welcome to the Digital Weighbridge System. Create a new slip to get started.</p>
-            <button className="btn btn-primary" style={{ padding: '20px 40px', fontSize: '1.2rem' }} onClick={() => setCurrentPage('New Slip')}>
-                Nayi Slip Banaye (Create New Slip)
-            </button>
+            <p>Welcome to the Digital Weighbridge System. Choose an option to get started.</p>
+            <div className="new-slip-actions">
+                <button className="btn btn-primary" onClick={() => onNewSlip('gross')}>
+                    Create Slip (Gross First)
+                </button>
+                <button className="btn btn-secondary" onClick={() => onNewSlip('tare')}>
+                    Create Slip (Tare First)
+                </button>
+            </div>
         </div>
          <div className="dashboard-card">
             <h3>Pending Slips</h3>
@@ -215,25 +330,42 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage, pendingSlipsCount
     </div>
 );
 
-const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage }) => {
+const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage, weighmentType }) => {
     const [vehicleNumber, setVehicleNumber] = useState('');
     const [material, setMaterial] = useState('');
-    const [grossWeight, setGrossWeight] = useState('');
+    const [weight, setWeight] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const isGrossFirst = weighmentType === 'gross';
+    const title = isGrossFirst ? 'Create New Slip (Gross Weight)' : 'Create New Slip (Tare Weight)';
+    const weightLabel = isGrossFirst ? 'Pehla Wajan (Gross Weight in ton)' : 'Pehla Wajan (Tare Weight in ton)';
+
+    useEffect(() => {
+        // Reset form when weighment type changes
+        setVehicleNumber('');
+        setMaterial('');
+        setWeight('');
+    }, [weighmentType]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!vehicleNumber || !material || !grossWeight) {
+        if (!vehicleNumber || !material || !weight) {
             alert('Please fill all fields');
             return;
         }
         setIsSubmitting(true);
         try {
-            await addSlip({
+            const payload: NewSlipPayload = {
                 vehicleNumber: vehicleNumber.toUpperCase(),
                 material,
-                grossWeight: parseFloat(grossWeight),
-            });
+            };
+            if (isGrossFirst) {
+                payload.grossWeight = parseFloat(weight);
+            } else {
+                payload.tareWeight = parseFloat(weight);
+            }
+
+            await addSlip(payload);
             setCurrentPage('All Slips');
         } catch (error) {
             // Error is handled globally in the App component
@@ -245,7 +377,7 @@ const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage }) =>
 
     return (
         <div>
-            <h2 className="page-header">Create New Slip (Gross Weight)</h2>
+            <h2 className="page-header">{title}</h2>
             <div className="form-container">
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
@@ -257,8 +389,8 @@ const NewSlipForm: React.FC<NewSlipFormProps> = ({ addSlip, setCurrentPage }) =>
                         <input id="material" type="text" value={material} onChange={e => setMaterial(e.target.value)} required disabled={isSubmitting} />
                     </div>
                     <div className="form-group">
-                        <label htmlFor="grossWeight">Pehla Wajan (Gross Weight in ton)</label>
-                        <input id="grossWeight" type="number" step="0.001" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} required disabled={isSubmitting} />
+                        <label htmlFor="weight">{weightLabel}</label>
+                        <input id="weight" type="number" step="0.001" value={weight} onChange={e => setWeight(e.target.value)} required disabled={isSubmitting} />
                     </div>
                     <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                         {isSubmitting ? 'Generating...' : 'Generate Pending Slip'}
@@ -298,25 +430,33 @@ const AllSlips: React.FC<AllSlipsProps> = ({ slips, onComplete, onPrint }) => {
                                 <tr>
                                     <th>Slip No.</th>
                                     <th>Vehicle No.</th>
-                                    <th>Gross Weight</th>
+                                    <th>First Weight</th>
                                     <th>Date/Time</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingSlips.map(slip => (
-                                    <tr key={slip.id}>
-                                        <td data-label="Slip No.">{slip.slipNumber}</td>
-                                        <td data-label="Vehicle No.">{slip.vehicleNumber}</td>
-                                        <td data-label="Gross Weight">{formatWeight(slip.grossWeight)}</td>
-                                        <td data-label="Date/Time">{slip.grossWeightTime || ''}</td>
-                                        <td data-label="Actions">
-                                            <button className="btn btn-secondary" onClick={() => onComplete(slip)}>
-                                                Add Tare Weight
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {pendingSlips.map(slip => {
+                                    const hasGrossWeight = typeof slip.grossWeight === 'number';
+                                    const firstWeight = hasGrossWeight ? slip.grossWeight : slip.tareWeight;
+                                    const firstWeightTime = hasGrossWeight ? slip.grossWeightTime : slip.tareWeightTime;
+                                    const actionText = hasGrossWeight ? 'Add Tare Weight' : 'Add Gross Weight';
+                                    const weightLabel = `${formatWeight(firstWeight)} (${hasGrossWeight ? 'Gross' : 'Tare'})`;
+
+                                    return (
+                                        <tr key={slip.id}>
+                                            <td data-label="Slip No.">{slip.slipNumber}</td>
+                                            <td data-label="Vehicle No.">{slip.vehicleNumber}</td>
+                                            <td data-label="First Weight">{weightLabel}</td>
+                                            <td data-label="Date/Time">{firstWeightTime || ''}</td>
+                                            <td data-label="Actions">
+                                                <button className="btn btn-secondary" onClick={() => onComplete(slip)}>
+                                                    {actionText}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     ) : <p>No pending slips found.</p>}
@@ -358,18 +498,27 @@ const AllSlips: React.FC<AllSlipsProps> = ({ slips, onComplete, onPrint }) => {
     );
 };
 
-const TareWeightModal: React.FC<TareWeightModalProps> = ({ slip, onSave, onCancel }) => {
-    const [tareWeight, setTareWeight] = useState('');
+const CompleteWeighmentModal: React.FC<CompleteWeighmentModalProps> = ({ slip, onSave, onCancel }) => {
+    const [secondWeight, setSecondWeight] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const isAddingTare = typeof slip.grossWeight === 'number';
+    const title = `Complete Weighment for Slip #${slip.slipNumber}`;
+    const weightLabel = isAddingTare ? 'Dusra Wajan (Tare Weight in ton)' : 'Dusra Wajan (Gross Weight in ton)';
+    const existingWeightLabel = isAddingTare ? 'Gross Weight' : 'Tare Weight';
+    const existingWeightValue = isAddingTare ? slip.grossWeight : slip.tareWeight;
+
     const handleSave = async () => {
-        if (!tareWeight) {
-            alert('Please enter Tare Weight.');
+        if (!secondWeight) {
+            alert('Please enter the second weight.');
             return;
         }
         setIsSubmitting(true);
         try {
-            await onSave(slip.id, parseFloat(tareWeight));
+            const weightData = isAddingTare
+                ? { tareWeight: parseFloat(secondWeight) }
+                : { grossWeight: parseFloat(secondWeight) };
+            await onSave(slip.id, weightData);
         } catch (error) {
             // Error is handled globally
             console.error(error);
@@ -382,14 +531,14 @@ const TareWeightModal: React.FC<TareWeightModalProps> = ({ slip, onSave, onCance
         <div className="modal-overlay">
             <div className="modal-content">
                 <div className="modal-header">
-                    <h2>Complete Weighment for Slip #{slip.slipNumber}</h2>
+                    <h2>{title}</h2>
                     <button onClick={onCancel} className="close-button" disabled={isSubmitting}>&times;</button>
                 </div>
                 <p><strong>Vehicle Number:</strong> {slip.vehicleNumber}</p>
-                <p><strong>Gross Weight:</strong> {formatWeight(slip.grossWeight)}</p>
+                <p><strong>{existingWeightLabel}:</strong> {formatWeight(existingWeightValue)}</p>
                 <div className="form-group">
-                    <label htmlFor="tareWeight">Dusra Wajan (Tare Weight in ton)</label>
-                    <input id="tareWeight" type="number" step="0.001" value={tareWeight} onChange={e => setTareWeight(e.target.value)} required disabled={isSubmitting} />
+                    <label htmlFor="secondWeight">{weightLabel}</label>
+                    <input id="secondWeight" type="number" step="0.001" value={secondWeight} onChange={e => setSecondWeight(e.target.value)} required disabled={isSubmitting} />
                 </div>
                 <div className="modal-actions">
                     <button className="btn btn-danger" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
@@ -560,6 +709,8 @@ const App = () => {
     const [slipToComplete, setSlipToComplete] = useState<Slip | null>(null);
     const [slipToPrint, setSlipToPrint] = useState<Slip | null>(null);
     const [isSidebarOpen, setSidebarOpen] = useState(false);
+    
+    const [weighmentType, setWeighmentType] = useState<'gross' | 'tare'>('gross');
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -569,7 +720,6 @@ const App = () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Fetch slips and settings in parallel
                 const [fetchedSlips, fetchedSettings] = await Promise.all([
                     apiService.getSlips(),
                     apiService.getSettings()
@@ -598,11 +748,16 @@ const App = () => {
         }
     };
 
-    const addSlip = async (slipData: NewSlipData) => {
+    const handleStartNewSlip = (type: 'gross' | 'tare') => {
+        setWeighmentType(type);
+        setCurrentPage('New Slip');
+    };
+
+    const addSlip = async (slipData: NewSlipPayload) => {
         setError(null);
         try {
             const newSlip = await apiService.createSlip(slipData);
-            setSlips(prev => [...prev, newSlip]);
+            setSlips(prev => [newSlip, ...prev]);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
             setError(`Could not create slip: ${errorMessage}`);
@@ -610,10 +765,10 @@ const App = () => {
         }
     };
 
-    const completeSlip = async (id: string, tareWeight: number) => {
+    const completeSlip = async (id: string, weightData: { grossWeight?: number; tareWeight?: number }) => {
         setError(null);
         try {
-            const updatedSlip = await apiService.completeSlip(id, tareWeight);
+            const updatedSlip = await apiService.completeSlip(id, weightData);
             setSlips(prevSlips => prevSlips.map(s => (s.id === id ? updatedSlip : s)));
             setSlipToComplete(null);
         } catch (err) {
@@ -640,17 +795,17 @@ const App = () => {
         if (isLoading) return null; 
 
         if (currentPage === 'New Slip') {
-            return <NewSlipForm addSlip={addSlip} setCurrentPage={handleSetCurrentPage} />;
+            return <NewSlipForm addSlip={addSlip} setCurrentPage={handleSetCurrentPage} weighmentType={weighmentType} />;
         }
         switch (currentPage) {
             case 'Dashboard':
-                return <Dashboard setCurrentPage={handleSetCurrentPage} pendingSlipsCount={slips.filter(s => s.status === 'Pending').length} />;
+                return <Dashboard setCurrentPage={handleSetCurrentPage} onNewSlip={handleStartNewSlip} pendingSlipsCount={slips.filter(s => s.status === 'Pending').length} />;
             case 'All Slips':
                 return <AllSlips slips={slips} onComplete={setSlipToComplete} onPrint={setSlipToPrint} />;
             case 'Settings':
                 return <SettingsComponent settings={settings} onSaveSettings={handleSaveSettings} />;
             default:
-                return <Dashboard setCurrentPage={handleSetCurrentPage} pendingSlipsCount={slips.filter(s => s.status === 'Pending').length} />;
+                return <Dashboard setCurrentPage={handleSetCurrentPage} onNewSlip={handleStartNewSlip} pendingSlipsCount={slips.filter(s => s.status === 'Pending').length} />;
         }
     };
 
@@ -670,7 +825,7 @@ const App = () => {
             </button>
             {isSidebarOpen && <div className="overlay no-print" onClick={() => setSidebarOpen(false)}></div>}
 
-            {slipToComplete && <TareWeightModal slip={slipToComplete} onSave={completeSlip} onCancel={() => setSlipToComplete(null)} />}
+            {slipToComplete && <CompleteWeighmentModal slip={slipToComplete} onSave={completeSlip} onCancel={() => setSlipToComplete(null)} />}
             {slipToPrint && <PrintView slip={slipToPrint} settings={settings} onCancel={() => setSlipToPrint(null)} />}
         </div>
     );
