@@ -1,0 +1,605 @@
+/* General Styles & Variables */
+:root {
+    --primary-color: #2A3F54;
+    --secondary-color: #337ab7;
+    --action-color: #26B99A;
+    --action-color-hover: #1e947a;
+    --bg-color: #F7F7F7;
+    --text-color: #5A738E;
+    --white: #FFFFFF;
+    --border-color: #ddd;
+    --danger-color: #d9534f;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+#root {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Layout */
+.app-container {
+    display: flex;
+    width: 100%;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: var(--primary-color);
+    color: var(--white);
+    padding: 20px 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    transition: left 0.3s ease-in-out;
+}
+
+.sidebar h1 {
+    font-size: 1.5rem;
+    text-align: center;
+    padding: 0 15px 20px 15px;
+    color: var(--white);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.sidebar nav ul {
+    list-style-type: none;
+}
+
+.sidebar nav li {
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    border-left: 5px solid transparent;
+}
+
+.sidebar nav li:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.sidebar nav li.active {
+    background-color: var(--action-color);
+    border-left: 5px solid var(--white);
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.page-header {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 25px;
+    color: var(--primary-color);
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Dashboard */
+.dashboard {
+    text-align: center;
+}
+
+.dashboard .dashboard-card {
+    background: var(--white);
+    padding: 40px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.dashboard .dashboard-card p {
+    font-size: 1.2rem;
+    margin-bottom: 25px;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+
+.btn-primary {
+    background-color: var(--action-color);
+    color: var(--white);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--action-color-hover);
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: var(--white);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #286090;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    color: var(--white);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #c9302c;
+}
+
+/* Forms */
+.form-container, .settings-container, .card {
+    background: var(--white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--primary-color);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.form-group input:disabled {
+    background-color: #f2f2f2;
+}
+
+/* Tables */
+.table-container {
+    margin-top: 20px;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.table-header h3 {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+}
+
+.search-input {
+    padding: 10px;
+    width: 300px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.slips-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.slips-table th, .slips-table td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.slips-table th {
+    background-color: #f2f2f2;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.slips-table td .btn {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    margin-right: 5px;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--white);
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    color: var(--primary-color);
+}
+
+.modal-header .close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-actions {
+    text-align: right;
+    margin-top: 25px;
+}
+
+.modal-actions .btn {
+    margin-left: 10px;
+}
+
+/* Print View & Controls */
+.print-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* This container is hidden by default and only used for printing */
+.print-container {
+    display: none;
+}
+
+/* This class is added temporarily to the .print-container for PDF generation */
+.pdf-capture-mode {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10mm;
+    position: absolute;
+    top: 0;
+    left: -9999px;
+    background: white;
+    width: 210mm; /* A4 width */
+    padding: 10mm;
+    box-sizing: border-box;
+}
+
+.pdf-capture-mode .slip-copy {
+    width: 100%;
+    padding: 10px;
+    margin: 0 auto;
+    border: 2px solid #333;
+    page-break-inside: avoid;
+    font-size: 12px;
+    color: #000;
+}
+
+.pdf-capture-mode .print-header h2 { margin: 0; font-size: 18px; color: #000; }
+.pdf-capture-mode .print-header p { margin: 0; font-size: 12px; color: #000; }
+.pdf-capture-mode .print-details-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #000; }
+.pdf-capture-mode .print-details-table td { padding: 6px; border: 1px solid #ccc; }
+.pdf-capture-mode .print-details-table td:first-child { font-weight: bold; width: 120px; }
+.pdf-capture-mode .print-footer { margin-top: 30px; text-align: right; font-size: 12px; color: #000; }
+
+
+@media print {
+    /* Hide all elements that are not part of the print view */
+    .no-print {
+        display: none !important;
+    }
+
+    /* Reset body and layout styles for printing */
+    body, #root, .app-container {
+        display: block;
+        background-color: #fff;
+    }
+
+    /* Make the modal overlay and content take up the whole page */
+    .modal-overlay {
+        position: static;
+        background: none;
+        display: block;
+    }
+
+    .modal-content {
+        box-shadow: none;
+        border: none;
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    /* Make the dedicated print container visible and style it */
+    .print-container {
+        display: flex !important;
+        flex-direction: column;
+        gap: 10mm; /* Add space between slip copies */
+    }
+
+    .slip-copy {
+        width: 100%;
+        padding: 10px;
+        margin: 0 auto;
+        border: 2px solid #333;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-size: 12px;
+    }
+
+    .print-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .print-header h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #000;
+    }
+    .print-header p {
+        margin: 0;
+        font-size: 12px;
+        color: #000;
+    }
+    .print-details-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        color: #000;
+    }
+    .print-details-table td {
+        padding: 6px;
+        border: 1px solid #ccc;
+    }
+    .print-details-table td:first-child {
+        font-weight: bold;
+        width: 120px;
+    }
+    .print-footer {
+        margin-top: 30px;
+        text-align: right;
+        font-size: 12px;
+        color: #000;
+    }
+}
+
+/* Mobile Navigation */
+.hamburger-menu {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1002;
+    background-color: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 5px;
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+    display: none;
+}
+
+/* Loading and Error states */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    color: var(--primary-color);
+}
+
+.spinner {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid var(--primary-color);
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: var(--danger-color);
+    color: var(--white);
+    padding: 15px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 2001;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+.error-notification p {
+    margin: 0;
+    padding-right: 20px;
+}
+
+.error-notification .close-button {
+    background: none;
+    border: none;
+    color: var(--white);
+    font-size: 1.5rem;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0 5px;
+}
+
+
+/* Responsive Styles */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        top: 0;
+        height: 100%;
+        z-index: 999;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+    }
+
+    .app-container.sidebar-open .sidebar {
+        left: 0;
+    }
+    
+    .app-container.sidebar-open .overlay {
+        display: block;
+    }
+
+    .main-content {
+        padding: 20px;
+        padding-top: 80px; /* Space for hamburger */
+    }
+
+    .hamburger-menu {
+        display: flex;
+    }
+    
+    /* Responsive Tables */
+    .slips-table {
+        border: none;
+        box-shadow: none;
+    }
+
+    .slips-table thead {
+        display: none;
+    }
+
+    .slips-table tr {
+        display: block;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        background: var(--white);
+        border: 1px solid var(--border-color);
+    }
+    
+    .slips-table td {
+        display: block;
+        text-align: right;
+        padding: 12px 15px;
+        border-bottom: 1px dotted var(--border-color);
+        position: relative;
+    }
+
+    .slips-table td:last-child {
+        border-bottom: none;
+    }
+
+    .slips-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 15px;
+        font-weight: bold;
+        text-align: left;
+        color: var(--primary-color);
+    }
+    
+    .slips-table td[data-label="Actions"] {
+        text-align: center;
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+    
+    .slips-table td[data-label="Actions"]::before {
+        display: none;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    .table-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .table-header h3 {
+        margin-bottom: 10px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+}
