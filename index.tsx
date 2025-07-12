@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -143,11 +142,8 @@ let nextSlipId = 3;
 
 
 // --- API CONFIGURATION ---
-// In a real application with a build process (like Vite or Create React App),
-// you would get this from an environment variable. For example:
-// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-// For now, we define it as a placeholder. Replace this when you deploy.
-const API_BASE_URL = 'http://localhost:5000/api'; // Replace with your actual backend URL
+// Use Vite env variable for API base URL, fallback to '/api' if not set
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 
 // --- REAL API SERVICE (Template using fetch for when your backend is ready) ---
